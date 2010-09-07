@@ -18,7 +18,9 @@ data DaemonOptions = DaemonOptions {
     daemonShouldRedirectStandardStreams :: Bool,
     daemonShouldCloseAllStreams :: Bool,
     daemonFileDescriptorsToLeaveOpen :: [POSIX.Fd],
-    daemonShouldIgnoreSignals :: Bool
+    daemonShouldIgnoreSignals :: Bool,
+    daemonUserToChangeTo :: Maybe String,
+    daemonGroupToChangeTo :: Maybe String
   }
 
 
@@ -28,7 +30,9 @@ defaultDaemonOptions = DaemonOptions {
                          daemonShouldRedirectStandardStreams = False,
                          daemonShouldCloseAllStreams = True,
                          daemonFileDescriptorsToLeaveOpen = [],
-                         daemonShouldIgnoreSignals = True
+                         daemonShouldIgnoreSignals = True,
+                         daemonUserToChangeTo = Nothing,
+                         daemonGroupToChangeTo = Nothing
                        }
 
 
@@ -37,6 +41,16 @@ foreign import ccall "daemon" c_daemon :: CInt -> CInt -> IO CInt
 
 daemonize :: DaemonOptions -> IO ()
 daemonize options = do
+  case daemonGroupToChangeTo options of
+    Nothing -> return ()
+    Just groupName -> do
+      groupEntry <- POSIX.getGroupEntryForName groupName
+      POSIX.setGroupID $ POSIX.groupID groupEntry
+  case daemonUserToChangeTo options of
+    Nothing -> return ()
+    Just userName -> do
+      userEntry <- POSIX.getUserEntryForName userName
+      POSIX.setUserID $ POSIX.userID userEntry
   let c_shouldChangeDirectory
         = if daemonShouldChangeDirectory options
             then 0
