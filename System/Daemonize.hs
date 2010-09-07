@@ -1,6 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 module System.Daemonize (
-                         DaemonOptions,
+                         DaemonOptions(..),
                          defaultDaemonOptions,
                          daemonize
                         )
