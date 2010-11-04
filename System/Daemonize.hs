@@ -9,14 +9,17 @@ module System.Daemonize (
 import qualified Control.Exception as Exception
 import Foreign
 import Foreign.C
+import System.Exit
 import System.IO
 import qualified System.Posix as POSIX
+
+import Control.Concurrent
 
 
 data DaemonOptions = DaemonOptions {
     daemonShouldChangeDirectory :: Bool,
     daemonShouldRedirectStandardStreams :: Bool,
-    daemonShouldCloseAllStreams :: Bool,
+    daemonShouldCloseStandardStreams :: Bool,
     daemonFileDescriptorsToLeaveOpen :: [POSIX.Fd],
     daemonShouldIgnoreSignals :: Bool,
     daemonUserToChangeTo :: Maybe String,
@@ -28,7 +31,7 @@ defaultDaemonOptions :: DaemonOptions
 defaultDaemonOptions = DaemonOptions {
                          daemonShouldChangeDirectory = True,
                          daemonShouldRedirectStandardStreams = False,
-                         daemonShouldCloseAllStreams = True,
+                         daemonShouldCloseStandardStreams = True,
                          daemonFileDescriptorsToLeaveOpen = [],
                          daemonShouldIgnoreSignals = True,
                          daemonUserToChangeTo = Nothing,
@@ -39,8 +42,8 @@ defaultDaemonOptions = DaemonOptions {
 foreign import ccall "daemon" c_daemon :: CInt -> CInt -> IO CInt
 
 
-daemonize :: DaemonOptions -> IO ()
-daemonize options = do
+daemonize :: DaemonOptions -> IO () -> IO ()
+daemonize options action = do
   case daemonGroupToChangeTo options of
     Nothing -> return ()
     Just groupName -> do
@@ -51,6 +54,12 @@ daemonize options = do
     Just userName -> do
       userEntry <- POSIX.getUserEntryForName userName
       POSIX.setUserID $ POSIX.userID userEntry
+  _ <- POSIX.forkProcess $ daemonize' options action
+  POSIX.exitImmediately ExitSuccess
+
+
+daemonize' :: DaemonOptions -> IO () -> IO ()
+daemonize' options action = do
   let c_shouldChangeDirectory
         = if daemonShouldChangeDirectory options
             then 0
@@ -69,18 +78,7 @@ daemonize options = do
       POSIX.installHandler POSIX.sigTSTP POSIX.Ignore Nothing
       return ()
     else return ()
-  if daemonShouldCloseAllStreams options
-    then do
-      mapM hClose [stdin, stdout, stderr]
-      let closeLoop i | i == 65536 = return ()
-                      | otherwise = do
-                          if not $ elem (POSIX.Fd i)
-                                        $ daemonFileDescriptorsToLeaveOpen options
-                            then Exception.catch (POSIX.closeFd $ POSIX.Fd i)
-                                   (\e -> do
-                                      return (e :: Exception.SomeException)
-                                      return ())
-                            else return ()
-                          closeLoop $ i + 1
-      closeLoop 0
+  if daemonShouldCloseStandardStreams options
+    then mapM_ hClose [stdin, stdout, stderr]
     else return ()
+  action

@@ -1,5 +1,5 @@
 name: direct-daemonize
-version: 1.0
+version: 2.0
 cabal-version: >= 1.2
 build-type: Simple
 license: BSD3
@@ -15,6 +15,13 @@ description:
   This package is a wrapper around the daemon() function on BSD-like Unices,
   including Mac OS X and glibc-based Linux distributions.  It does not function on
   other systems.
+  
+  Version 2.0 fixes compatibility problems with the threaded GHC runtime.  Doing this
+  required two non-backwards-compatible API changes.  First, the daemonize function
+  now takes an action to perform as a daemon, and never returns.  Second, the
+  functionality of closing all open files has been removed, as it caused crashes.  As
+  a substitute, the option of closing only the three standard streams has been added
+  and made the default.
 
 Library
   exposed-modules: System.Daemonize
