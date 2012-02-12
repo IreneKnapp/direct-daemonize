@@ -20,7 +20,6 @@ data DaemonOptions = DaemonOptions {
     daemonShouldChangeDirectory :: Bool,
     daemonShouldRedirectStandardStreams :: Bool,
     daemonShouldCloseStandardStreams :: Bool,
-    daemonFileDescriptorsToLeaveOpen :: [POSIX.Fd],
     daemonShouldIgnoreSignals :: Bool,
     daemonUserToChangeTo :: Maybe String,
     daemonGroupToChangeTo :: Maybe String
@@ -32,7 +31,6 @@ defaultDaemonOptions = DaemonOptions {
                          daemonShouldChangeDirectory = True,
                          daemonShouldRedirectStandardStreams = False,
                          daemonShouldCloseStandardStreams = True,
-                         daemonFileDescriptorsToLeaveOpen = [],
                          daemonShouldIgnoreSignals = True,
                          daemonUserToChangeTo = Nothing,
                          daemonGroupToChangeTo = Nothing
