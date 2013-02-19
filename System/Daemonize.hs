@@ -40,24 +40,14 @@ defaultDaemonOptions = DaemonOptions {
 foreign import ccall "daemon" c_daemon :: CInt -> CInt -> IO CInt
 
 
-daemonize :: DaemonOptions -> IO () -> IO ()
-daemonize options action = do
-  case daemonGroupToChangeTo options of
-    Nothing -> return ()
-    Just groupName -> do
-      groupEntry <- POSIX.getGroupEntryForName groupName
-      POSIX.setGroupID $ POSIX.groupID groupEntry
-  case daemonUserToChangeTo options of
-    Nothing -> return ()
-    Just userName -> do
-      userEntry <- POSIX.getUserEntryForName userName
-      POSIX.setUserID $ POSIX.userID userEntry
-  _ <- POSIX.forkProcess $ daemonize' options action
+daemonize :: DaemonOptions -> IO a -> (a -> IO ()) -> IO ()
+daemonize options privilegedAction mainAction = do
+  _ <- POSIX.forkProcess $ daemonize' options privilegedAction mainAction
   POSIX.exitImmediately ExitSuccess
 
 
-daemonize' :: DaemonOptions -> IO () -> IO ()
-daemonize' options action = do
+daemonize' :: DaemonOptions -> IO a -> (a -> IO ()) -> IO ()
+daemonize' options privilegedAction mainAction = do
   let c_shouldChangeDirectory
         = if daemonShouldChangeDirectory options
             then 0
@@ -69,6 +59,7 @@ daemonize' options action = do
   throwErrnoIfMinus1 "daemonize"
                      $ c_daemon c_shouldChangeDirectory
                                 c_shouldRedirectStandardStreams
+  privilegedResult <- privilegedAction
   if daemonShouldIgnoreSignals options
     then do
       POSIX.installHandler POSIX.sigTTOU POSIX.Ignore Nothing
@@ -79,4 +70,14 @@ daemonize' options action = do
   if daemonShouldCloseStandardStreams options
     then mapM_ hClose [stdin, stdout, stderr]
     else return ()
-  action
+  case daemonGroupToChangeTo options of
+    Nothing -> return ()
+    Just groupName -> do
+      groupEntry <- POSIX.getGroupEntryForName groupName
+      POSIX.setGroupID $ POSIX.groupID groupEntry
+  case daemonUserToChangeTo options of
+    Nothing -> return ()
+    Just userName -> do
+      userEntry <- POSIX.getUserEntryForName userName
+      POSIX.setUserID $ POSIX.userID userEntry
+  mainAction privilegedResult
