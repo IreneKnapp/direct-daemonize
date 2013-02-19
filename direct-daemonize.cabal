@@ -1,5 +1,5 @@
 name: direct-daemonize
-version: 3.0.0.1
+version: 3.1
 cabal-version: >= 1.12
 build-type: Simple
 license: BSD3
@@ -15,6 +15,11 @@ description:
   This package is a wrapper around the daemon() function on BSD-like Unices,
   including Mac OS X and glibc-based Linux distributions.  It does not function
   on other systems.
+  .
+  Version 3.1 adds the ability to do something after forking but before
+  dropping privileges.  It also no longer uses the system-provided daemon()
+  function, which is highly unfortunate but necessary with the RTS's use of
+  per-process timers.
   .
   Version 3.0.0.1 updates this documentation to be properly broken into
   paragraphs.

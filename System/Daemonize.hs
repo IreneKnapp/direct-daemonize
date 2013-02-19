@@ -18,7 +18,6 @@ import Control.Concurrent
 
 data DaemonOptions = DaemonOptions {
     daemonShouldChangeDirectory :: Bool,
-    daemonShouldRedirectStandardStreams :: Bool,
     daemonShouldCloseStandardStreams :: Bool,
     daemonShouldIgnoreSignals :: Bool,
     daemonUserToChangeTo :: Maybe String,
@@ -29,15 +28,11 @@ data DaemonOptions = DaemonOptions {
 defaultDaemonOptions :: DaemonOptions
 defaultDaemonOptions = DaemonOptions {
                          daemonShouldChangeDirectory = True,
-                         daemonShouldRedirectStandardStreams = False,
                          daemonShouldCloseStandardStreams = True,
                          daemonShouldIgnoreSignals = True,
                          daemonUserToChangeTo = Nothing,
                          daemonGroupToChangeTo = Nothing
                        }
-
-
-foreign import ccall "daemon" c_daemon :: CInt -> CInt -> IO CInt
 
 
 daemonize :: DaemonOptions -> IO a -> (a -> IO ()) -> IO ()
@@ -48,18 +43,10 @@ daemonize options privilegedAction mainAction = do
 
 daemonize' :: DaemonOptions -> IO a -> (a -> IO ()) -> IO ()
 daemonize' options privilegedAction mainAction = do
-  let c_shouldChangeDirectory
-        = if daemonShouldChangeDirectory options
-            then 0
-            else 1
-      c_shouldRedirectStandardStreams
-        = if daemonShouldRedirectStandardStreams options
-            then 0
-            else 1
-  throwErrnoIfMinus1 "daemonize"
-                     $ c_daemon c_shouldChangeDirectory
-                                c_shouldRedirectStandardStreams
-  privilegedResult <- privilegedAction
+  _ <- POSIX.createSession
+  if daemonShouldChangeDirectory options
+    then POSIX.changeWorkingDirectory "/"
+    else return ()
   if daemonShouldIgnoreSignals options
     then do
       POSIX.installHandler POSIX.sigTTOU POSIX.Ignore Nothing
@@ -67,6 +54,7 @@ daemonize' options privilegedAction mainAction = do
       POSIX.installHandler POSIX.sigTSTP POSIX.Ignore Nothing
       return ()
     else return ()
+  privilegedResult <- privilegedAction
   if daemonShouldCloseStandardStreams options
     then mapM_ hClose [stdin, stdout, stderr]
     else return ()
